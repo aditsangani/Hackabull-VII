@@ -1,3 +1,6 @@
+import { useCallback } from 'react'
+import { usePosture, ZONE_COLORS } from '../context/PostureContext'
+
 function MetricCard({ label, value, badge, badgeStyle = 'blue' }) {
   const badgeClass = badgeStyle === 'gray'
     ? 'bg-gray-100 text-gray-800'
@@ -27,44 +30,111 @@ const hourlyData = [
 const barColor = { good: 'bg-blue-600', warn: 'bg-blue-200', bad: 'bg-gray-200' }
 const streaks = ['done','done','miss','done','done','active','upcoming','upcoming']
 
+const ZONE_LABELS = { GREEN: 'Good', AMBER: 'Warning', RED: 'Tech neck', UNCALIBRATED: 'Not calibrated', UNKNOWN: '—' }
+
 export default function Dashboard() {
+  const { angle, zone, score, drop, baseline, landmarksDetected, cameraReady, canvasRef } = usePosture()
+
+  // Callback ref: sets canvasRef.current so PostureContext draws onto this canvas
+  const setCanvas = useCallback(el => { canvasRef.current = el }, [canvasRef])
+
+  const zoneColor = ZONE_COLORS[zone] || ZONE_COLORS.UNCALIBRATED
+  const scoreLabel = score !== null ? ZONE_LABELS[zone] : 'Not calibrated'
+  const scoreDisplay = score !== null ? String(score) : '—'
+  const angleDisplay = angle !== null ? `${angle}°` : '—°'
+  const dropDisplay = drop !== null ? `${drop > 0 ? '+' : ''}${drop}°` : '—'
+
+  const showAlert = zone === 'RED' && baseline !== null
+  const showWarning = zone === 'AMBER' && baseline !== null
+
   return (
     <div className="flex flex-col gap-4 p-6 overflow-y-auto h-full">
       <div>
         <h1 className="text-[18px] font-medium text-gray-900">Dashboard</h1>
-        <p className="text-[13px] text-gray-400 mt-0.5">Today, Saturday — Session active for 2h 14m</p>
+        <p className="text-[13px] text-gray-400 mt-0.5">Today, Friday — Session active</p>
       </div>
 
       <div className="grid grid-cols-3 gap-2.5">
-        <MetricCard label="Posture score" value="84" badge="Good" />
-        <MetricCard label="Time in blue zone" value="1h 42m" badge="78%" />
-        <MetricCard label="Alerts today" value="3" badge="2 resolved" badgeStyle="gray" />
+        <MetricCard label="Posture score" value={scoreDisplay} badge={scoreLabel} />
+        <MetricCard label="Angle" value={angleDisplay} badge={baseline ? `Baseline ${baseline}°` : 'Calibrate first'} />
+        <MetricCard label="Drop from baseline" value={dropDisplay} badge={zone !== 'UNCALIBRATED' ? ZONE_LABELS[zone] : '—'} badgeStyle={zone === 'RED' ? 'gray' : 'blue'} />
       </div>
 
-      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
-        <div className="w-2 h-2 rounded-full bg-blue-600 mt-1 shrink-0" />
-        <div>
-          <div className="text-[13px] font-medium text-blue-800">Tech neck detected — 8 min ago</div>
-          <div className="text-[12px] text-blue-600 mt-0.5">Head angle dropped to 138°. Time for a 30-second shoulder reset.</div>
+      {showAlert && (
+        <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex items-start gap-3">
+          <div className="w-2 h-2 rounded-full bg-red-500 mt-1 shrink-0" />
+          <div>
+            <div className="text-[13px] font-medium text-red-800">Tech neck detected</div>
+            <div className="text-[12px] text-red-600 mt-0.5">Head angle dropped {drop}° from baseline. Time for a 30-second shoulder reset.</div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {showWarning && (
+        <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-4 flex items-start gap-3">
+          <div className="w-2 h-2 rounded-full bg-yellow-500 mt-1 shrink-0" />
+          <div>
+            <div className="text-[13px] font-medium text-yellow-800">Posture drifting</div>
+            <div className="text-[12px] text-yellow-600 mt-0.5">Angle dropped {drop}° from baseline — try to straighten up.</div>
+          </div>
+        </div>
+      )}
+
+      {!showAlert && !showWarning && baseline && zone === 'GREEN' && (
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
+          <div className="w-2 h-2 rounded-full bg-blue-600 mt-1 shrink-0" />
+          <div>
+            <div className="text-[13px] font-medium text-blue-800">Great posture — keep it up!</div>
+            <div className="text-[12px] text-blue-600 mt-0.5">You're within {drop !== null ? Math.abs(drop) : 0}° of your baseline. Looking good.</div>
+          </div>
+        </div>
+      )}
+
+      {!baseline && (
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
+          <div className="w-2 h-2 rounded-full bg-blue-600 mt-1 shrink-0" />
+          <div>
+            <div className="text-[13px] font-medium text-blue-800">Calibrate to start scoring</div>
+            <div className="text-[12px] text-blue-600 mt-0.5">Go to the Calibrate screen to set your posture baseline.</div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2.5">
         <div className="bg-white border border-blue-100 rounded-xl p-4">
-          <div className="text-[14px] font-medium text-gray-900 mb-3">Live detection</div>
-          <div className="bg-page rounded-lg h-28 flex flex-col items-center justify-center gap-2 border-2 border-blue-400 relative">
-            <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-medium px-2 py-0.5 rounded-full">LIVE</span>
-            <div className="opacity-30 flex flex-col items-center gap-1">
-              <div className="w-5 h-5 rounded-full border-2 border-blue-600" />
-              <div className="w-12 h-0.5 bg-blue-600" />
-              <div className="w-0.5 h-8 bg-blue-600" />
-            </div>
-            <span className="absolute bottom-2 text-[11px] text-blue-600 font-medium">Landmarks detected</span>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[14px] font-medium text-gray-900">Live detection</div>
+            {cameraReady && (
+              <span className="bg-red-500 text-white text-[10px] font-medium px-2 py-0.5 rounded-full">LIVE</span>
+            )}
           </div>
+
+          {/* Camera canvas — PostureContext draws the skeleton overlay onto this */}
+          <div
+            className="bg-page rounded-lg overflow-hidden relative"
+            style={{ height: 112, borderWidth: 2, borderStyle: 'solid', borderColor: zoneColor, borderRadius: 8, transition: 'border-color 0.4s' }}
+          >
+            <canvas
+              ref={setCanvas}
+              width={640}
+              height={480}
+              style={{ width: '100%', height: '100%', display: 'block' }}
+            />
+            {!cameraReady && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-[11px] text-gray-400">Waiting for camera…</span>
+              </div>
+            )}
+          </div>
+
           <div className="text-center mt-3">
-            <div className="text-[26px] font-medium text-blue-600 font-mono">172°</div>
+            <div className="text-[26px] font-medium font-mono" style={{ color: zoneColor }}>
+              {angleDisplay}
+            </div>
             <div className="text-[11px] text-gray-400 mt-0.5">Ear → shoulder → hip angle</div>
-            <div className="text-[11px] text-blue-500 mt-1">Good posture (threshold: 150°)</div>
+            <div className="text-[11px] mt-1" style={{ color: zoneColor }}>
+              {landmarksDetected ? (baseline ? ZONE_LABELS[zone] : 'Calibrate to score') : (cameraReady ? 'No landmarks — check framing' : 'Starting camera…')}
+            </div>
           </div>
         </div>
 
